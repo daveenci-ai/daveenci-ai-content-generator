@@ -6,14 +6,17 @@ const PORT = process.env.PORT || 3000; // Render provides the PORT environment v
 
 // --- Accessing your Environment Variables ---
 const APP_URL = process.env.APP_URL; // This should be 'https://seo.daveenci.ai'
-const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL;
+const AUTH_SERVER_URL = process.env.AUTH_SERVER_URL; // Base auth server URL
 const DATABASE_URL = process.env.DATABASE_URL; // Might not be directly used in this simple test app
 const OAUTH_CLIENT_ID = process.env.OAUTH_CLIENT_ID;
 const OAUTH_CLIENT_SECRET = process.env.OAUTH_CLIENT_SECRET;
 // The OAUTH_REDIRECT_URI *must* match the URL where your auth server will redirect back to this app.
-// For Render, this will be your custom domain + path, e.g., 'https://seo.daveenci.ai/oauth/callback'
+// For Render, this will be your custom domain + path, e.g., 'https://seo.daveenci.ai/api/auth/callback'
 const OAUTH_REDIRECT_URI = process.env.OAUTH_REDIRECT_URI;
 const SESSION_SECRET = process.env.SESSION_SECRET; // Used for session management, if you implement it
+
+// OAuth Endpoint URLs (can be full URLs or will be constructed from AUTH_SERVER_URL + paths)
+// OAUTH_AUTHORIZE_URL, OAUTH_TOKEN_URL, OAUTH_USERINFO_URL
 
 // --- Basic Routes for Testing ---
 
@@ -30,15 +33,13 @@ app.get('/', (req, res) => {
         <p>Your configured Auth Server: <code>${AUTH_SERVER_URL}</code></p>
         <p>Your Client ID: <code>${OAUTH_CLIENT_ID}</code></p>
         <p>Your Redirect URI: <code>${OAUTH_REDIRECT_URI}</code></p>
-        <p>Authorization Endpoint: <code>${AUTH_SERVER_URL}${process.env.OAUTH_AUTHORIZE_PATH || '/authorize'}</code></p>
-        <p>Token Endpoint: <code>${AUTH_SERVER_URL}${process.env.OAUTH_TOKEN_PATH || '/token'}</code></p>
         <hr>
-        <p><strong>Troubleshooting:</strong> If you get "Endpoint not found" errors, your auth server might use different endpoint paths. Common alternatives:</p>
+        <p><strong>OAuth Endpoints:</strong></p>
         <ul>
-            <li>Authorization: <code>/oauth/authorize</code>, <code>/auth/authorize</code>, <code>/oidc/authorize</code></li>
-            <li>Token: <code>/oauth/token</code>, <code>/auth/token</code>, <code>/oidc/token</code></li>
+            <li>Authorization: <code>${process.env.OAUTH_AUTHORIZE_URL || `${AUTH_SERVER_URL}${process.env.OAUTH_AUTHORIZE_PATH || '/oauth/authorize'}`}</code></li>
+            <li>Token: <code>${process.env.OAUTH_TOKEN_URL || `${AUTH_SERVER_URL}${process.env.OAUTH_TOKEN_PATH || '/oauth/token'}`}</code></li>
+            <li>User Info: <code>${process.env.OAUTH_USERINFO_URL || `${AUTH_SERVER_URL}/oauth/userinfo`}</code></li>
         </ul>
-        <p>Set <code>OAUTH_AUTHORIZE_PATH</code> and <code>OAUTH_TOKEN_PATH</code> environment variables to override defaults.</p>
         <hr>
         <p><a href="/login">Click here to initiate the OAuth/OIDC login flow</a></p>
         <p>Check the server logs on Render for more details during the flow.</p>
@@ -47,25 +48,19 @@ app.get('/', (req, res) => {
 
 // 2. Initiate OAuth/OIDC Login Flow
 app.get('/login', (req, res) => {
-    // Common authorization endpoint paths - try different ones if /authorize doesn't work
-    const authorizePath = process.env.OAUTH_AUTHORIZE_PATH || '/authorize';
-    // Alternative paths you might need: '/oauth/authorize', '/auth/authorize', '/oidc/authorize'
+    // Use full URL if provided, otherwise construct from base URL + path
+    const authorizeBaseUrl = process.env.OAUTH_AUTHORIZE_URL || 
+                            `${AUTH_SERVER_URL}${process.env.OAUTH_AUTHORIZE_PATH || '/oauth/authorize'}`;
     
     // Construct the authorization URL
     // Adjust 'response_type' and 'scope' based on your auth server's requirements (e.g., 'code', 'id_token', 'token')
-    const authUrl = `${AUTH_SERVER_URL}${authorizePath}?` +
+    const authUrl = `${authorizeBaseUrl}?` +
                     `client_id=${OAUTH_CLIENT_ID}&` +
                     `redirect_uri=${encodeURIComponent(OAUTH_REDIRECT_URI)}&` +
                     `response_type=code&` + // Assuming Authorization Code Flow
                     `scope=openid profile email offline_access`; // Adjust scopes as needed
 
     console.log(`Initiating OAuth flow. Redirecting to: ${authUrl}`);
-    console.log(`If you get "Endpoint not found", try setting OAUTH_AUTHORIZE_PATH environment variable to:`);
-    console.log(`- /oauth/authorize`);
-    console.log(`- /auth/authorize`);
-    console.log(`- /oidc/authorize`);
-    console.log(`- Or check your auth server documentation for the correct path`);
-    
     res.redirect(authUrl);
 });
 
@@ -91,11 +86,11 @@ app.get('/api/auth/callback', async (req, res) => {
 
     // --- Exchange the Authorization Code for Tokens ---
     // This part requires making a POST request to your authentication server's token endpoint.
-    const tokenPath = process.env.OAUTH_TOKEN_PATH || '/token';
-    // Alternative paths: '/oauth/token', '/auth/token', '/oidc/token'
+    const tokenUrl = process.env.OAUTH_TOKEN_URL || 
+                    `${AUTH_SERVER_URL}${process.env.OAUTH_TOKEN_PATH || '/oauth/token'}`;
     
     try {
-        const tokenResponse = await fetch(`${AUTH_SERVER_URL}${tokenPath}`, {
+        const tokenResponse = await fetch(tokenUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
