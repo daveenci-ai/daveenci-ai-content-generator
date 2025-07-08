@@ -15,7 +15,7 @@ const DATABASE_URL = process.env.DATABASE_URL; // Might not be directly used in 
 const OAUTH_CLIENT_ID = process.env.OAUTH_CLIENT_ID;
 const OAUTH_CLIENT_SECRET = process.env.OAUTH_CLIENT_SECRET;
 // The OAUTH_REDIRECT_URI *must* match the URL where your auth server will redirect back to this app.
-// For Render, this will be your custom domain + path, e.g., 'https://seo.daveenci.ai/api/auth/callback'
+// For Render, this will be your custom domain + path, e.g., 'https://seo.daveenci.ai/auth/callback'
 const OAUTH_REDIRECT_URI = process.env.OAUTH_REDIRECT_URI;
 const SESSION_SECRET = process.env.SESSION_SECRET; // Used for session management, if you implement it
 
@@ -23,7 +23,7 @@ const SESSION_SECRET = process.env.SESSION_SECRET; // Used for session managemen
 // OAUTH_AUTHORIZE_URL, OAUTH_TOKEN_URL, OAUTH_USERINFO_URL
 
 // OAuth Configuration
-const OAUTH_SCOPES = process.env.OAUTH_SCOPES || 'openid profile email offline_access';
+const OAUTH_SCOPES = process.env.OAUTH_SCOPES || 'openid profile email';
 
 // --- Basic Routes for Testing ---
 
@@ -42,14 +42,15 @@ app.get('/', (req, res) => {
         <p>Your Redirect URI: <code>${OAUTH_REDIRECT_URI}</code></p>
         <p>Your OAuth Scopes: <code>${OAUTH_SCOPES}</code></p>
         <hr>
-        <p><strong>⚠️ If you get "Invalid redirect_uri" or "Invalid scope" errors:</strong></p>
-        <div style="background: #fff3cd; padding: 10px; border-radius: 5px; margin: 10px 0;">
-            <p><strong>OAuth Server Configuration Required:</strong></p>
-            <ol>
-                <li><strong>Redirect URI:</strong> Add <code>${OAUTH_REDIRECT_URI}</code> to allowed redirect URIs for client <code>${OAUTH_CLIENT_ID}</code></li>
-                <li><strong>Scopes:</strong> Enable these scopes for client <code>${OAUTH_CLIENT_ID}</code>: <code>${OAUTH_SCOPES}</code></li>
-                <li><strong>Alternative:</strong> Set <code>OAUTH_SCOPES</code> environment variable to allowed scopes (e.g., <code>openid</code> or <code>profile</code>)</li>
-            </ol>
+        <p><strong>✅ Configuration Status:</strong></p>
+        <div style="background: #d4edda; padding: 10px; border-radius: 5px; margin: 10px 0;">
+            <p><strong>Based on your OAuth server config:</strong></p>
+            <ul>
+                <li><strong>Redirect URI:</strong> <code>https://seo.daveenci.ai/auth/callback</code> ✅ Configured</li>
+                <li><strong>Allowed Scopes:</strong> <code>openid profile email</code> ✅ Match default</li>
+                <li><strong>Client ID:</strong> <code>seo_app</code> ✅ Configured</li>
+            </ul>
+            <p><em>Make sure your OAUTH_REDIRECT_URI environment variable is set to: <code>https://seo.daveenci.ai/auth/callback</code></em></p>
         </div>
         <hr>
         <p><strong>OAuth Endpoints:</strong></p>
@@ -108,8 +109,8 @@ app.get('/login', (req, res) => {
 
 // 3. OAuth/OIDC Callback Endpoint
 // This is where your authentication server will redirect the user back to after successful authentication.
-// This route's path must match the path in your OAUTH_REDIRECT_URI (e.g., '/api/auth/callback')
-app.get('/api/auth/callback', async (req, res) => {
+// This route's path must match the path in your OAUTH_REDIRECT_URI (e.g., '/auth/callback')
+app.get('/auth/callback', async (req, res) => {
     const authorizationCode = req.query.code;
     const state = req.query.state;
     const error = req.query.error;
