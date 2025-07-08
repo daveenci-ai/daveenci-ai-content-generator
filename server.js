@@ -17,6 +17,11 @@ const SESSION_SECRET = process.env.SESSION_SECRET; // Used for session managemen
 
 // --- Basic Routes for Testing ---
 
+// Handle favicon requests to prevent 404 errors in logs
+app.get('/favicon.ico', (req, res) => {
+    res.status(204).send(); // No content response
+});
+
 // 1. Home Page: Provides a link to initiate the login flow
 app.get('/', (req, res) => {
     res.send(`
