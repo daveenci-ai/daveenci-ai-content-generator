@@ -22,6 +22,9 @@ const SESSION_SECRET = process.env.SESSION_SECRET; // Used for session managemen
 // OAuth Endpoint URLs (can be full URLs or will be constructed from AUTH_SERVER_URL + paths)
 // OAUTH_AUTHORIZE_URL, OAUTH_TOKEN_URL, OAUTH_USERINFO_URL
 
+// OAuth Configuration
+const OAUTH_SCOPES = process.env.OAUTH_SCOPES || 'openid profile email offline_access';
+
 // --- Basic Routes for Testing ---
 
 // Handle favicon requests to prevent 404 errors in logs
@@ -37,6 +40,17 @@ app.get('/', (req, res) => {
         <p>Your configured Auth Server: <code>${AUTH_SERVER_URL}</code></p>
         <p>Your Client ID: <code>${OAUTH_CLIENT_ID}</code></p>
         <p>Your Redirect URI: <code>${OAUTH_REDIRECT_URI}</code></p>
+        <p>Your OAuth Scopes: <code>${OAUTH_SCOPES}</code></p>
+        <hr>
+        <p><strong>⚠️ If you get "Invalid redirect_uri" or "Invalid scope" errors:</strong></p>
+        <div style="background: #fff3cd; padding: 10px; border-radius: 5px; margin: 10px 0;">
+            <p><strong>OAuth Server Configuration Required:</strong></p>
+            <ol>
+                <li><strong>Redirect URI:</strong> Add <code>${OAUTH_REDIRECT_URI}</code> to allowed redirect URIs for client <code>${OAUTH_CLIENT_ID}</code></li>
+                <li><strong>Scopes:</strong> Enable these scopes for client <code>${OAUTH_CLIENT_ID}</code>: <code>${OAUTH_SCOPES}</code></li>
+                <li><strong>Alternative:</strong> Set <code>OAUTH_SCOPES</code> environment variable to allowed scopes (e.g., <code>openid</code> or <code>profile</code>)</li>
+            </ol>
+        </div>
         <hr>
         <p><strong>OAuth Endpoints:</strong></p>
         <ul>
@@ -49,6 +63,7 @@ app.get('/', (req, res) => {
             <li>✅ CSRF Protection: State parameter automatically generated</li>
             <li>✅ State Validation: Prevents replay attacks</li>
             <li>✅ State Expiration: 10-minute timeout</li>
+            <li>✅ Configurable Scopes: Set via OAUTH_SCOPES environment variable</li>
         </ul>
         <hr>
         <p><a href="/login">Click here to initiate the OAuth/OIDC login flow</a></p>
@@ -83,7 +98,7 @@ app.get('/login', (req, res) => {
                     `client_id=${OAUTH_CLIENT_ID}&` +
                     `redirect_uri=${encodeURIComponent(OAUTH_REDIRECT_URI)}&` +
                     `response_type=code&` + // Assuming Authorization Code Flow
-                    `scope=openid profile email offline_access&` + // Adjust scopes as needed
+                    `scope=${encodeURIComponent(OAUTH_SCOPES)}&` + // Configurable scopes
                     `state=${state}`; // CSRF protection
 
     console.log(`Initiating OAuth flow with state: ${state}`);
