@@ -1,8 +1,12 @@
 const express = require('express');
 const fetch = require('node-fetch');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000; // Render provides the PORT environment variable
+
+// Simple in-memory store for state values (in production, use Redis or database)
+const stateStore = new Map();
 
 // --- Accessing your Environment Variables ---
 const APP_URL = process.env.APP_URL; // This should be 'https://seo.daveenci.ai'
@@ -40,6 +44,12 @@ app.get('/', (req, res) => {
             <li>Token: <code>${process.env.OAUTH_TOKEN_URL || `${AUTH_SERVER_URL}${process.env.OAUTH_TOKEN_PATH || '/oauth/token'}`}</code></li>
             <li>User Info: <code>${process.env.OAUTH_USERINFO_URL || `${AUTH_SERVER_URL}/oauth/userinfo`}</code></li>
         </ul>
+        <p><strong>Security Features:</strong></p>
+        <ul>
+            <li>✅ CSRF Protection: State parameter automatically generated</li>
+            <li>✅ State Validation: Prevents replay attacks</li>
+            <li>✅ State Expiration: 10-minute timeout</li>
+        </ul>
         <hr>
         <p><a href="/login">Click here to initiate the OAuth/OIDC login flow</a></p>
         <p>Check the server logs on Render for more details during the flow.</p>
@@ -48,19 +58,36 @@ app.get('/', (req, res) => {
 
 // 2. Initiate OAuth/OIDC Login Flow
 app.get('/login', (req, res) => {
+    // Generate a random state parameter for CSRF protection
+    const state = crypto.randomBytes(32).toString('hex');
+    const timestamp = Date.now();
+    
+    // Store state with timestamp (expire after 10 minutes)
+    stateStore.set(state, { timestamp, used: false });
+    
+    // Clean up expired states (older than 10 minutes)
+    const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
+    for (const [key, value] of stateStore.entries()) {
+        if (value.timestamp < tenMinutesAgo) {
+            stateStore.delete(key);
+        }
+    }
+    
     // Use full URL if provided, otherwise construct from base URL + path
     const authorizeBaseUrl = process.env.OAUTH_AUTHORIZE_URL || 
                             `${AUTH_SERVER_URL}${process.env.OAUTH_AUTHORIZE_PATH || '/oauth/authorize'}`;
     
-    // Construct the authorization URL
+    // Construct the authorization URL with state parameter
     // Adjust 'response_type' and 'scope' based on your auth server's requirements (e.g., 'code', 'id_token', 'token')
     const authUrl = `${authorizeBaseUrl}?` +
                     `client_id=${OAUTH_CLIENT_ID}&` +
                     `redirect_uri=${encodeURIComponent(OAUTH_REDIRECT_URI)}&` +
                     `response_type=code&` + // Assuming Authorization Code Flow
-                    `scope=openid profile email offline_access`; // Adjust scopes as needed
+                    `scope=openid profile email offline_access&` + // Adjust scopes as needed
+                    `state=${state}`; // CSRF protection
 
-    console.log(`Initiating OAuth flow. Redirecting to: ${authUrl}`);
+    console.log(`Initiating OAuth flow with state: ${state}`);
+    console.log(`Redirecting to: ${authUrl}`);
     res.redirect(authUrl);
 });
 
@@ -69,6 +96,7 @@ app.get('/login', (req, res) => {
 // This route's path must match the path in your OAUTH_REDIRECT_URI (e.g., '/api/auth/callback')
 app.get('/api/auth/callback', async (req, res) => {
     const authorizationCode = req.query.code;
+    const state = req.query.state;
     const error = req.query.error;
     const errorDescription = req.query.error_description;
 
@@ -82,7 +110,29 @@ app.get('/api/auth/callback', async (req, res) => {
         return res.status(400).send('Authentication failed: No code received.');
     }
 
+    // Validate state parameter for CSRF protection
+    if (!state) {
+        console.error('OAuth Callback: No state parameter received.');
+        return res.status(400).send('Authentication failed: No state parameter received.');
+    }
+
+    const stateData = stateStore.get(state);
+    if (!stateData) {
+        console.error(`OAuth Callback: Invalid or expired state parameter: ${state}`);
+        return res.status(400).send('Authentication failed: Invalid or expired state parameter.');
+    }
+
+    if (stateData.used) {
+        console.error(`OAuth Callback: State parameter already used: ${state}`);
+        return res.status(400).send('Authentication failed: State parameter already used.');
+    }
+
+    // Mark state as used to prevent replay attacks
+    stateData.used = true;
+    stateStore.set(state, stateData);
+
     console.log(`Received Authorization Code: ${authorizationCode}`);
+    console.log(`State validation successful: ${state}`);
 
     // --- Exchange the Authorization Code for Tokens ---
     // This part requires making a POST request to your authentication server's token endpoint.
