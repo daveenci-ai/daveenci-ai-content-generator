@@ -46,8 +46,8 @@ app.get('/login', (req, res) => {
 
 // 3. OAuth/OIDC Callback Endpoint
 // This is where your authentication server will redirect the user back to after successful authentication.
-// This route's path must match the path in your OAUTH_REDIRECT_URI (e.g., '/oauth/callback')
-app.get('/oauth/callback', async (req, res) => {
+// This route's path must match the path in your OAUTH_REDIRECT_URI (e.g., '/api/auth/callback')
+app.get('/api/auth/callback', async (req, res) => {
     const authorizationCode = req.query.code;
     const error = req.query.error;
     const errorDescription = req.query.error_description;
